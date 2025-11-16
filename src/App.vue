@@ -2,6 +2,7 @@
 
 <script setup> 
 import { ref, onMounted } from 'vue';
+import { romajiMap } from './romajiMap.js';
 const question = ref('Now Loading...'); 
 let txt = "./wordlist.txt";
 let wordList = [];
