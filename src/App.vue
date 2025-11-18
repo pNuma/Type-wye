@@ -1,11 +1,17 @@
 <script setup lang="ts"></script>
 
 <script setup> 
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, onUnmounted } from 'vue';
 import { romajiMap } from './romajiMap.js';
 const question = ref('Now Loading...'); 
 let txt = "./wordlist.txt";
 let wordList = [];
+
+const currentWordIndex = ref(0); 
+const currentCharIndex = ref(0); 
+const remainingPatterns = ref([]); 
+const currentRomajiInput = ref('');
+
 
 const handleInput = (e) => {
   const inputText = e.target.value; 
@@ -21,11 +27,32 @@ onMounted(() => {
     .then(data => {
       wordList = data.split(/\n/);
       question.value = wordList[0];
+
+      currentWordIndex.value = 0;
+      currentCharIndex.value = 0;
+      currentRomajiInput.value = '';
+
+      const firstChar = wordList[0][0];
+
+      if (romajiMap[firstChar]) {
+        remainingPatterns.value = romajiMap[firstChar];
+      } else {
+        // マップにない文字（記号とか）なら、その文字そのものを正解とする
+        remainingPatterns.value = [firstChar];
+      }
+      
+      console.log("1文字目の正解パターン:", remainingPatterns.value);
     })
     .catch(error => {
       console.error('ファイルが読み込めません:', error);
       question.value = 'お題が見つかりません';
     });
+
+    window.addEventListener('keydown', handleKeyDown);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleKeyDown);
 });
 
 
@@ -46,6 +73,14 @@ const convertRomaji = (word) => {
   }
   
   return result;
+};
+
+
+const handleKeyDown = (event) => {
+  console.log("押されたキー:", event.key);
+  
+  // 判定ロジック
+  // (例: 's' が来たら、正解パターンの先頭と比べる…)
 };
 
 </script>
