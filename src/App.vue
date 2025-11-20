@@ -11,6 +11,7 @@ const currentWordIndex = ref(0)
 const currentCharIndex = ref(0)
 const remainingPatterns = ref([])
 const currentRomajiInput = ref('')
+const totalKeystrokes = ref(0)
 
 const handleInput = (e) => {
   const inputText = e.target.value
@@ -88,6 +89,7 @@ const handleKeyDown = (event) => {
 
   if (nextPatterns.length > 0) {
     console.log('次の候補:', nextPatterns)
+    totalKeystrokes.value++
 
     currentRomajiInput.value = nextInput
     remainingPatterns.value = nextPatterns
@@ -134,6 +136,5 @@ const handleKeyDown = (event) => {
 
   <br />
 
-  入力欄<br />
-  <input type="text" id="user-input" @input="handleInput" />
+  <div>タイプ数: {{ totalKeystrokes }} 回</div>
 </template>
