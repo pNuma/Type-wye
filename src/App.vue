@@ -1,60 +1,45 @@
-<script setup lang="ts"></script>
-
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
 import { romajiMap } from './romajiMap.js'
+
+// 状態変数たち
 const question = ref('Now Loading...')
+const questionReading = ref('') // 読み仮名用
+const userRomaji = ref('')
 let txt = './wordlist.txt'
 let wordList = []
 
-//input
+// ゲーム進行用
 const currentWordIndex = ref(0)
 const currentCharIndex = ref(0)
 const remainingPatterns = ref([])
 const currentRomajiInput = ref('')
+const isPlaying = ref(false) // ゲーム中フラグ
 
-//result
+// リザルト用
 const totalKeystrokes = ref(0)
 const missCount = ref(0)
 const elapsedTime = ref(0)
 let timerId = null
-
-//system
-const isPlaying = ref(false)
-
-const handleInput = (event) => {
-  const inputText = event.target.value
-
-  console.log('今、入力された文字:', inputText)
-}
+let startTime = 0
 
 onMounted(() => {
   fetch(txt)
-    .then((response) => {
-      return response.text()
-    })
+    .then((response) => response.text())
     .then((data) => {
+      // データの読み込みと加工（漢字対応）
       const list = data
         .split(/\n/)
         .map((word) => word.trim())
         .filter((word) => word.length > 0)
+        .map((line) => {
+          const parts = line.split(',')
+          const display = parts[0]
+          const reading = parts[1] || parts[0]
+          return { display, reading }
+        })
       wordList = list
       question.value = 'Press Space to Start'
-
-      currentWordIndex.value = 0
-      currentCharIndex.value = 0
-      currentRomajiInput.value = ''
-
-      const firstChar = wordList[0][0]
-
-      if (romajiMap[firstChar]) {
-        remainingPatterns.value = romajiMap[firstChar]
-      } else {
-        // マップにない文字（記号とか）なら、その文字そのものを正解とする
-        remainingPatterns.value = [firstChar]
-      }
-
-      console.log('1文字目の正解パターン:', remainingPatterns.value)
     })
     .catch((error) => {
       console.error('ファイルが読み込めません:', error)
@@ -68,40 +53,41 @@ onUnmounted(() => {
   window.removeEventListener('keydown', handleKeyDown)
 })
 
-// romajiMap を使って、カタカナ文字列をローマ字候補の配列に変換
-const convertRomaji = (word) => {
-  const result = []
-
-  for (let i = 0; i < word.length; i++) {
-    const char = word[i]
-
-    const candidates = romajiMap[char]
-
-    if (candidates) {
-      result.push(candidates)
-    } else {
-      result.push([char])
-    }
-  }
-
-  return result
+// タイマー機能
+const startTimer = () => {
+  startTime = Date.now()
+  timerId = setInterval(() => {
+    const now = Date.now()
+    elapsedTime.value = (now - startTime) / 1000
+  }, 10)
 }
 
 const handleKeyDown = (event) => {
-  console.log('押されたキー:', event.key)
-  if (event.code === 'Space') {
-    isPlaying.value = true
-    startTimer()
+  if (!isPlaying.value) {
+    if (event.code === 'Space') {
+      console.log('ゲームスタートなのです！')
+      isPlaying.value = true
+      startTimer()
 
-    currentWordIndex.value = 0
-    currentCharIndex.value = 0
-    currentRomajiInput.value = ''
+      // 初期化
+      currentWordIndex.value = 0
+      currentCharIndex.value = 0
+      currentRomajiInput.value = ''
+      userRomaji.value = ''
+      totalKeystrokes.value = 0
+      missCount.value = 0
+      elapsedTime.value = 0
 
-    const firstWord = wordList[0]
-    question.value = firstWord
+      // 最初の単語をセット
+      const firstWordObj = wordList[0]
+      question.value = firstWordObj.display
+      questionReading.value = firstWordObj.reading
 
-    const firstChar = firstWord[0]
-    remainingPatterns.value = romajiMap[firstChar]
+      // 最初の文字のパターン
+      const firstChar = firstWordObj.reading[0]
+      remainingPatterns.value = romajiMap[firstChar]
+    }
+    return
   }
 
   const nextInput = currentRomajiInput.value + event.key
@@ -109,66 +95,72 @@ const handleKeyDown = (event) => {
   const nextPatterns = remainingPatterns.value.filter((pattern) => {
     return pattern.startsWith(nextInput)
   })
-  if (nextPatterns.length > 0) {
-    console.log('次の候補:', nextPatterns)
-    totalKeystrokes.value++
 
+  if (nextPatterns.length > 0) {
+    // 正しい入力
+    totalKeystrokes.value++
     currentRomajiInput.value = nextInput
     remainingPatterns.value = nextPatterns
 
-    //正解処理
+    userRomaji.value += event.key
+
+    // 文字が完成したか
     if (remainingPatterns.value.includes(currentRomajiInput.value)) {
       currentCharIndex.value++
       currentRomajiInput.value = ''
 
-      // 単語が完成したかチェック
-      if (currentCharIndex.value >= wordList[currentWordIndex.value].length) {
+      const currentWordObj = wordList[currentWordIndex.value] // 現在の単語オブジェクト
+
+      // 単語が完成したか
+      if (currentCharIndex.value >= currentWordObj.reading.length) {
         console.log('次の単語へ')
         currentWordIndex.value++
+
+        // ゲーム終了チェック
         if (currentWordIndex.value >= wordList.length) {
           question.value = 'おしまい！お疲れ様でした！'
+          questionReading.value = '' // 読み仮名は消す
+          userRomaji.value = ''
           clearInterval(timerId)
+          isPlaying.value = false // ゲーム終了状態
         } else {
+          // 次の単語へ
+          userRomaji.value = ''
           currentCharIndex.value = 0
-          const nextWord = wordList[currentWordIndex.value]
-          question.value = nextWord
-          const nextChar = nextWord[0]
-          remainingPatterns.value = romajiMap[nextChar]
 
-          console.log('次の単語をセット:', nextWord)
+          const nextWordObj = wordList[currentWordIndex.value]
+          question.value = nextWordObj.display // 漢字
+          questionReading.value = nextWordObj.reading // ふりがな
+
+          const nextChar = nextWordObj.reading[0] // 判定は「読み」で
+          remainingPatterns.value = romajiMap[nextChar]
         }
       } else {
-        const currentWord = wordList[currentWordIndex.value]
-        const nextChar = currentWord[currentCharIndex.value]
-
+        // 次の文字へ（単語の途中）
+        const nextChar = currentWordObj.reading[currentCharIndex.value]
         remainingPatterns.value = romajiMap[nextChar]
-        console.log('次の文字の正解パターンをセット:', remainingPatterns.value)
       }
     }
   } else {
+    // ミスタイプ
     missCount.value++
-    console.log(missCount.value)
   }
-}
-
-let startTime = 0
-const startTimer = () => {
-  startTime = Date.now()
-
-  timerId = setInterval(() => {
-    const now = Date.now()
-    elapsedTime.value = (now - startTime) / 1000
-  }, 10)
 }
 </script>
 
 <template>
   <div id="question-display">
-    {{ question }}
+    <div style="font-size: 1.5rem; color: gray">{{ questionReading }}</div>
+    <div style="font-size: 3rem">{{ question }}</div>
+  </div>
+
+  <div style="color: deepskyblue; font-weight: bold; font-size: 2rem; min-height: 3rem">
+    {{ userRomaji }}
   </div>
 
   <br />
 
   <div>タイプ数: {{ totalKeystrokes }} 回</div>
+  <div>ミス数: {{ missCount }} 回</div>
   <div>タイム: {{ elapsedTime.toFixed(1) }} 秒</div>
 </template>
