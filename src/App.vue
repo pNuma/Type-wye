@@ -7,14 +7,23 @@ const question = ref('Now Loading...')
 let txt = './wordlist.txt'
 let wordList = []
 
+//input
 const currentWordIndex = ref(0)
 const currentCharIndex = ref(0)
 const remainingPatterns = ref([])
 const currentRomajiInput = ref('')
-const totalKeystrokes = ref(0)
 
-const handleInput = (e) => {
-  const inputText = e.target.value
+//result
+const totalKeystrokes = ref(0)
+const missCount = ref(0)
+const elapsedTime = ref(0)
+let timerId = null
+
+//system
+const isPlaying = ref(false)
+
+const handleInput = (event) => {
+  const inputText = event.target.value
 
   console.log('今、入力された文字:', inputText)
 }
@@ -30,7 +39,7 @@ onMounted(() => {
         .map((word) => word.trim())
         .filter((word) => word.length > 0)
       wordList = list
-      question.value = wordList[0]
+      question.value = 'Press Space to Start'
 
       currentWordIndex.value = 0
       currentCharIndex.value = 0
@@ -80,13 +89,26 @@ const convertRomaji = (word) => {
 
 const handleKeyDown = (event) => {
   console.log('押されたキー:', event.key)
+  if (event.code === 'Space') {
+    isPlaying.value = true
+    startTimer()
+
+    currentWordIndex.value = 0
+    currentCharIndex.value = 0
+    currentRomajiInput.value = ''
+
+    const firstWord = wordList[0]
+    question.value = firstWord
+
+    const firstChar = firstWord[0]
+    remainingPatterns.value = romajiMap[firstChar]
+  }
 
   const nextInput = currentRomajiInput.value + event.key
 
   const nextPatterns = remainingPatterns.value.filter((pattern) => {
     return pattern.startsWith(nextInput)
   })
-
   if (nextPatterns.length > 0) {
     console.log('次の候補:', nextPatterns)
     totalKeystrokes.value++
@@ -104,8 +126,8 @@ const handleKeyDown = (event) => {
         console.log('次の単語へ')
         currentWordIndex.value++
         if (currentWordIndex.value >= wordList.length) {
-          console.log('おしまい')
           question.value = 'おしまい！お疲れ様でした！'
+          clearInterval(timerId)
         } else {
           currentCharIndex.value = 0
           const nextWord = wordList[currentWordIndex.value]
@@ -124,8 +146,19 @@ const handleKeyDown = (event) => {
       }
     }
   } else {
-    console.log('違う')
+    missCount.value++
+    console.log(missCount.value)
   }
+}
+
+let startTime = 0
+const startTimer = () => {
+  startTime = Date.now()
+
+  timerId = setInterval(() => {
+    const now = Date.now()
+    elapsedTime.value = (now - startTime) / 1000
+  }, 10)
 }
 </script>
 
@@ -137,4 +170,5 @@ const handleKeyDown = (event) => {
   <br />
 
   <div>タイプ数: {{ totalKeystrokes }} 回</div>
+  <div>タイム: {{ elapsedTime.toFixed(1) }} 秒</div>
 </template>
