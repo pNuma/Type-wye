@@ -62,10 +62,44 @@ const startTimer = () => {
   }, 10)
 }
 
+const smallKana = ['ァ', 'ィ', 'ゥ', 'ェ', 'ォ', 'ッ', 'ャ', 'ュ', 'ョ', 'ヮ', 'ヵ', 'ヶ']
+
+//カタカナ文と現在位置から、打てるパターンを計算する関数
+const getNextPatterns = (reading, index) => {
+  if (index >= reading.length) return []
+
+  const patterns = []
+  const char1 = reading[index]
+  const char2 = reading[index + 1]
+
+  // --- パターンA: 拗音
+  if (char2 && smallKana.includes(char2)) {
+    const compound = char1 + char2 //例： "シ"+"ャ"="シャ"
+
+    if (romajiMap[compound]) {
+      romajiMap[compound].forEach((r) => {
+        patterns.push({ val: r, len: 2 }) // 2文字進む
+      })
+    }
+  }
+
+  // --- パターンB: 通常の1文字 ---
+  if (romajiMap[char1]) {
+    romajiMap[char1].forEach((r) => {
+      patterns.push({ val: r, len: 1 }) // 1文字進む
+    })
+  } else {
+    // 記号など
+    patterns.push({ val: char1, len: 1 })
+  }
+
+  return patterns
+}
+
 const handleKeyDown = (event) => {
   if (!isPlaying.value) {
     if (event.code === 'Space') {
-      console.log('ゲームスタートなのです！')
+      console.log('ゲームスタート')
       isPlaying.value = true
       startTimer()
 
@@ -84,8 +118,7 @@ const handleKeyDown = (event) => {
       questionReading.value = firstWordObj.reading
 
       // 最初の文字のパターン
-      const firstChar = firstWordObj.reading[0]
-      remainingPatterns.value = romajiMap[firstChar]
+      remainingPatterns.value = getNextPatterns(firstWordObj.reading, 0)
     }
     return
   }
@@ -93,7 +126,7 @@ const handleKeyDown = (event) => {
   const nextInput = currentRomajiInput.value + event.key
 
   const nextPatterns = remainingPatterns.value.filter((pattern) => {
-    return pattern.startsWith(nextInput)
+    return pattern.val.startsWith(nextInput)
   })
 
   if (nextPatterns.length > 0) {
@@ -104,9 +137,11 @@ const handleKeyDown = (event) => {
 
     userRomaji.value += event.key
 
+    const matched = remainingPatterns.value.find((p) => p.val === currentRomajiInput.value)
+
     // 文字が完成したか
-    if (remainingPatterns.value.includes(currentRomajiInput.value)) {
-      currentCharIndex.value++
+    if (matched) {
+      currentCharIndex.value += matched.len
       currentRomajiInput.value = ''
 
       const currentWordObj = wordList[currentWordIndex.value] // 現在の単語オブジェクト
@@ -132,13 +167,11 @@ const handleKeyDown = (event) => {
           question.value = nextWordObj.display // 漢字
           questionReading.value = nextWordObj.reading // ふりがな
 
-          const nextChar = nextWordObj.reading[0] // 判定は「読み」で
-          remainingPatterns.value = romajiMap[nextChar]
+          remainingPatterns.value = getNextPatterns(nextWordObj.reading, 0)
         }
       } else {
         // 次の文字へ（単語の途中）
-        const nextChar = currentWordObj.reading[currentCharIndex.value]
-        remainingPatterns.value = romajiMap[nextChar]
+        remainingPatterns.value = getNextPatterns(currentWordObj.reading, currentCharIndex.value)
       }
     }
   } else {
