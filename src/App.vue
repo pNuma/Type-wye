@@ -83,6 +83,21 @@ const getNextPatterns = (reading, index) => {
     }
   }
 
+  //促音の重ね打ち
+  if (char1 === 'ッ' && char2) {
+    if (romajiMap[char2]) {
+      const nextRomajiCandidates = romajiMap[char2]
+
+      // 次の文字の子音を見る
+      nextRomajiCandidates.forEach((nextRomaji) => {
+        const consonant = nextRomaji[0]
+
+        if (!['a', 'i', 'u', 'e', 'o', 'n'].includes(consonant)) {
+          patterns.push({ val: consonant, len: 1 })
+        }
+      })
+    }
+  }
   // --- パターンB: 通常の1文字 ---
   if (romajiMap[char1]) {
     romajiMap[char1].forEach((r) => {
