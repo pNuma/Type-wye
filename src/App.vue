@@ -72,7 +72,7 @@ const getNextPatterns = (reading, index) => {
   const char1 = reading[index]
   const char2 = reading[index + 1]
 
-  // --- パターンA: 拗音
+  // 拗音
   if (char2 && smallKana.includes(char2)) {
     const compound = char1 + char2 //例： "シ"+"ャ"="シャ"
 
@@ -83,7 +83,7 @@ const getNextPatterns = (reading, index) => {
     }
   }
 
-  //促音の重ね打ち
+  //促音
   if (char1 === 'ッ' && char2) {
     if (romajiMap[char2]) {
       const nextRomajiCandidates = romajiMap[char2]
@@ -98,6 +98,23 @@ const getNextPatterns = (reading, index) => {
       })
     }
   }
+
+  //ンの入力
+  else if (char1 === 'ン') {
+    patterns.push({ val: 'nn', len: 1 })
+    patterns.push({ val: 'xn', len: 1 })
+
+    if (char2 && romajiMap[char2]) {
+      romajiMap[char2].forEach((nextRomaji) => {
+        const nextHead = nextRomaji[0]
+
+        if (!['a', 'i', 'u', 'e', 'o', 'n', 'y'].includes(nextHead)) {
+          patterns.push({ val: 'n' + nextRomaji, len: 2 })
+        }
+      })
+    }
+  }
+
   // --- パターンB: 通常の1文字 ---
   if (romajiMap[char1]) {
     romajiMap[char1].forEach((r) => {
