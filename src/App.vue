@@ -36,7 +36,10 @@ onMounted(() => {
           const parts = line.split(',')
           const display = parts[0]
           const reading = parts[1] || parts[0]
-          return { display, reading }
+
+          const optimal = calculateOptimalKeystrokes(reading)
+
+          return { display, reading, optimal }
         })
       wordList = list
       question.value = 'Press Space to Start'
@@ -126,6 +129,30 @@ const getNextPatterns = (reading, index) => {
   }
 
   return patterns
+}
+
+// 読み仮名から、理論上の最短タイプ数を計算する関数(DP)
+const calculateOptimalKeystrokes = (reading) => {
+  const dp = new Array(reading.length + 1).fill(Infinity)
+
+  dp[0] = 0
+
+  for (let i = 0; i < reading.length; i++) {
+    if (dp[i] === Infinity) continue
+
+    const patterns = getNextPatterns(reading, i)
+
+    patterns.forEach((pattern) => {
+      const nextIndex = i + pattern.len
+
+      const strokes = pattern.val.length
+
+      if (dp[i] + strokes < dp[nextIndex]) {
+        dp[nextIndex] = dp[i] + strokes
+      }
+    })
+  }
+  return dp[reading.length]
 }
 
 const handleKeyDown = (event) => {
@@ -224,7 +251,9 @@ const handleKeyDown = (event) => {
   </div>
 
   <br />
-
+  <div style="color: gray; font-size: 0.8rem">
+    最適打鍵数: {{ wordList[currentWordIndex]?.optimal }} 回
+  </div>
   <div>タイプ数: {{ totalKeystrokes }} 回</div>
   <div>ミス数: {{ missCount }} 回</div>
   <div>タイム: {{ elapsedTime.toFixed(1) }} 秒</div>
