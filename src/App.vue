@@ -14,7 +14,6 @@ const currentWordIndex = ref(0)
 const currentCharIndex = ref(0)
 const remainingPatterns = ref([])
 const currentRomajiInput = ref('')
-const isPlaying = ref(false) // ゲーム中フラグ
 
 // リザルト用
 const totalKeystrokes = ref(0)
@@ -77,7 +76,7 @@ const getNextPatterns = (reading, index) => {
 
   // 拗音
   if (char2 && smallKana.includes(char2)) {
-    const compound = char1 + char2 //例： "シ"+"ャ"="シャ"
+    const compound = char1 + char2
 
     if (romajiMap[compound]) {
       romajiMap[compound].forEach((r) => {
@@ -118,7 +117,7 @@ const getNextPatterns = (reading, index) => {
     }
   }
 
-  // --- パターンB: 通常の1文字 ---
+  // 通常の1文字
   if (romajiMap[char1]) {
     romajiMap[char1].forEach((r) => {
       patterns.push({ val: r, len: 1 }) // 1文字進む
@@ -155,11 +154,16 @@ const calculateOptimalKeystrokes = (reading) => {
   return dp[reading.length]
 }
 
+// ゲームの状態 ('start' | 'playing' | 'result')
+const gameState = ref('start')
+
+// 理論値の合計
+const totalOptimalKeystrokes = ref(0)
+
 const handleKeyDown = (event) => {
-  if (!isPlaying.value) {
+  if (gameState.value === 'start') {
     if (event.code === 'Space') {
-      console.log('ゲームスタート')
-      isPlaying.value = true
+      gameState.value = 'playing'
       startTimer()
 
       // 初期化
@@ -170,14 +174,23 @@ const handleKeyDown = (event) => {
       totalKeystrokes.value = 0
       missCount.value = 0
       elapsedTime.value = 0
+      totalOptimalKeystrokes.value = 0
 
-      // 最初の単語をセット
+      // 最初の単語セット
       const firstWordObj = wordList[0]
       question.value = firstWordObj.display
       questionReading.value = firstWordObj.reading
-
-      // 最初の文字のパターン
       remainingPatterns.value = getNextPatterns(firstWordObj.reading, 0)
+    }
+    return
+  }
+
+  // 2. リザルト画面のとき（リトライ機能）
+  if (gameState.value === 'result') {
+    if (event.code === 'Space') {
+      // もう一度スタート画面に戻るのです
+      gameState.value = 'start'
+      question.value = 'Press Space to Start'
     }
     return
   }
@@ -208,15 +221,15 @@ const handleKeyDown = (event) => {
       // 単語が完成したか
       if (currentCharIndex.value >= currentWordObj.reading.length) {
         console.log('次の単語へ')
+        // 単語の理論値を合計に足す
+        totalOptimalKeystrokes.value += currentWordObj.optimal
+
         currentWordIndex.value++
 
-        // ゲーム終了チェック
         if (currentWordIndex.value >= wordList.length) {
-          question.value = 'おしまい！お疲れ様でした！'
-          questionReading.value = '' // 読み仮名は消す
-          userRomaji.value = ''
+          // ゲーム終了！
           clearInterval(timerId)
-          isPlaying.value = false // ゲーム終了状態
+          gameState.value = 'result' // リザルト画面へ！
         } else {
           // 次の単語へ
           userRomaji.value = ''
@@ -241,20 +254,150 @@ const handleKeyDown = (event) => {
 </script>
 
 <template>
-  <div id="question-display">
-    <div style="font-size: 1.5rem; color: gray">{{ questionReading }}</div>
-    <div style="font-size: 3rem">{{ question }}</div>
-  </div>
+  <div class="container">
+    <div v-if="gameState === 'start'" class="screen start-screen">
+      <h1 class="title">しらないタイピング</h1>
+      <p class="blink">Press Space to Start</p>
+    </div>
 
-  <div style="color: deepskyblue; font-weight: bold; font-size: 2rem; min-height: 3rem">
-    {{ userRomaji }}
-  </div>
+    <div v-else-if="gameState === 'playing'" class="screen play-screen">
+      <div class="hud">
+        <span>Time: {{ elapsedTime.toFixed(1) }}</span>
+        <span>Score: {{ totalKeystrokes }}</span>
+      </div>
 
-  <br />
-  <div style="color: gray; font-size: 0.8rem">
-    最適打鍵数: {{ wordList[currentWordIndex]?.optimal }} 回
+      <div id="question-display">
+        <div class="reading">{{ questionReading }}</div>
+        <div class="kanji">{{ question }}</div>
+        <div class="input-feedback">{{ userRomaji }}</div>
+      </div>
+    </div>
+
+    <div v-else-if="gameState === 'result'" class="screen result-screen">
+      <h2>Result</h2>
+
+      <div class="result-box">
+        <div class="result-item">
+          <span class="label">タイム</span>
+          <span class="value">{{ elapsedTime.toFixed(2) }}秒</span>
+        </div>
+        <div class="result-item">
+          <span class="label">あなたの入力数</span>
+          <span class="value">{{ totalKeystrokes }}打</span>
+        </div>
+        <div class="result-item">
+          <span class="label">理論上の最短</span>
+          <span class="value">{{ totalOptimalKeystrokes }}打</span>
+        </div>
+        <div class="result-item">
+          <span class="label">無駄打ち</span>
+          <span class="value" :class="{ good: totalKeystrokes - totalOptimalKeystrokes <= 0 }">
+            +{{ totalKeystrokes - totalOptimalKeystrokes }}
+          </span>
+        </div>
+        <div class="result-item">
+          <span class="label">ミスタイプ</span>
+          <span class="value" :class="{ bad: missCount > 0 }">{{ missCount }}回</span>
+        </div>
+      </div>
+
+      <p class="blink retry-msg">Press Space to Retry</p>
+    </div>
   </div>
-  <div>タイプ数: {{ totalKeystrokes }} 回</div>
-  <div>ミス数: {{ missCount }} 回</div>
-  <div>タイム: {{ elapsedTime.toFixed(1) }} 秒</div>
 </template>
+
+<style scoped>
+/* 全体の箱：画面の真ん中に持ってくるのです */
+.container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  background-color: #222; /* 黒に近いグレー */
+  color: #fff;
+  font-family: 'Courier New', monospace; /* プログラミングっぽいフォント */
+  text-align: center;
+}
+
+/* 各画面共通 */
+.screen {
+  width: 100%;
+  max-width: 800px;
+}
+
+/* タイトル */
+.title {
+  font-size: 4rem;
+  margin-bottom: 2rem;
+  color: #00ffcc; /* サイバーな緑 */
+  text-shadow: 0 0 10px #00ffcc;
+}
+
+/* 点滅アニメーション */
+.blink {
+  animation: blink 1s infinite;
+  font-size: 1.5rem;
+  margin-top: 2rem;
+}
+@keyframes blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+
+/* プレイ画面 */
+.hud {
+  display: flex;
+  justify-content: space-between;
+  font-size: 1.2rem;
+  margin-bottom: 3rem;
+  border-bottom: 1px solid #555;
+  padding-bottom: 10px;
+}
+.reading {
+  font-size: 1.5rem;
+  color: #aaa;
+  margin-bottom: 0.5rem;
+}
+.kanji {
+  font-size: 4rem;
+  font-weight: bold;
+  margin-bottom: 1rem;
+}
+.input-feedback {
+  font-size: 2.5rem;
+  font-weight: bold;
+  color: deepskyblue;
+  min-height: 3rem; /* 文字がなくてもガタつかないように */
+  text-shadow: 0 0 5px deepskyblue;
+}
+
+/* リザルト画面 */
+.result-box {
+  background: #333;
+  padding: 2rem;
+  border-radius: 10px;
+  margin: 2rem auto;
+  width: 80%;
+}
+.result-item {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+  font-size: 1.5rem;
+  border-bottom: 1px dashed #555;
+}
+.good {
+  color: #00ffcc;
+}
+.bad {
+  color: #ff3366;
+}
+.retry-msg {
+  color: #aaa;
+}
+</style>
