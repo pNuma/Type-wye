@@ -4,6 +4,7 @@ import { romajiMap } from './romajiMap.js'
 
 // 状態変数たち
 const question = ref('Now Loading...')
+const showRomajiTable = ref(false)
 const questionReading = ref('') // 読み仮名用
 const userRomaji = ref('')
 let txt = './wordlist.txt'
@@ -16,17 +17,104 @@ const remainingPatterns = ref([])
 const currentRomajiInput = ref('')
 
 // リザルト用
-const totalKeystrokes = ref(0)
+const totaltype = ref(0)
+const correcttype = ref(0)
 const missCount = ref(0)
 const elapsedTime = ref(0)
 let timerId = null
 let startTime = 0
 
+// 理論値の合計
+const totalOptimalKeystrokes = ref(0)
+// ゲームの状態 ('start' | 'playing' | 'result')
+const gameState = ref('start')
+
+const smallKana = ['ァ', 'ィ', 'ゥ', 'ェ', 'ォ', 'ッ', 'ャ', 'ュ', 'ョ', 'ヮ', 'ヵ', 'ヶ']
+
+// --- ロジック関数群 ---
+
+// 読み仮名から、理論上の最短タイプ数を計算する関数(DP)
+const calculateOptimalKeystrokes = (reading) => {
+  const dp = new Array(reading.length + 1).fill(Infinity)
+  dp[0] = 0
+  for (let i = 0; i < reading.length; i++) {
+    if (dp[i] === Infinity) continue
+    const patterns = getNextPatterns(reading, i)
+    patterns.forEach((pattern) => {
+      const nextIndex = i + pattern.len
+      const strokes = pattern.val.length
+      if (dp[i] + strokes < dp[nextIndex]) {
+        dp[nextIndex] = dp[i] + strokes
+      }
+    })
+  }
+  return dp[reading.length]
+}
+
+// カタカナ文と現在位置から、打てるパターンを計算する関数
+const getNextPatterns = (reading, index) => {
+  if (index >= reading.length) return []
+  const patterns = []
+  const char1 = reading[index]
+  const char2 = reading[index + 1]
+
+  // A. 拗音
+  if (char2 && smallKana.includes(char2)) {
+    const compound = char1 + char2
+    if (romajiMap[compound]) {
+      romajiMap[compound].forEach((r) => {
+        patterns.push({ val: r, len: 2 })
+      })
+    }
+  }
+
+  // B. 促音（っ）
+  if (char1 === 'ッ' && char2) {
+    if (romajiMap[char2]) {
+      const nextRomajiCandidates = romajiMap[char2]
+      nextRomajiCandidates.forEach((nextRomaji) => {
+        const consonant = nextRomaji[0]
+        if (!['a', 'i', 'u', 'e', 'o', 'n'].includes(consonant)) {
+          patterns.push({ val: consonant, len: 1 })
+        }
+      })
+    }
+  }
+
+  // C. 撥音（ん）
+  else if (char1 === 'ン') {
+    patterns.push({ val: 'nn', len: 1 })
+    patterns.push({ val: 'xn', len: 1 })
+
+    if (char2 && romajiMap[char2]) {
+      romajiMap[char2].forEach((nextRomaji) => {
+        const nextHead = nextRomaji[0]
+        // 母音、な行、や行 以外なら合体（持ち越し）
+        if (!['a', 'i', 'u', 'e', 'o', 'n', 'y'].includes(nextHead)) {
+          patterns.push({ val: 'n' + nextRomaji, len: 2 })
+        }
+      })
+    }
+  }
+
+  // D. 通常の1文字
+  else if (romajiMap[char1]) {
+    romajiMap[char1].forEach((r) => {
+      patterns.push({ val: r, len: 1 })
+    })
+  } else {
+    patterns.push({ val: char1, len: 1 })
+  }
+
+  return patterns
+}
+
+// --- 初期化とイベントハンドラ ---
+
 onMounted(() => {
   fetch(txt)
     .then((response) => response.text())
     .then((data) => {
-      // データの読み込みと加工（漢字対応）
       const list = data
         .split(/\n/)
         .map((word) => word.trim())
@@ -35,9 +123,7 @@ onMounted(() => {
           const parts = line.split(',')
           const display = parts[0]
           const reading = parts[1] || parts[0]
-
           const optimal = calculateOptimalKeystrokes(reading)
-
           return { display, reading, optimal }
         })
       wordList = list
@@ -55,7 +141,6 @@ onUnmounted(() => {
   window.removeEventListener('keydown', handleKeyDown)
 })
 
-// タイマー機能
 const startTimer = () => {
   startTime = Date.now()
   timerId = setInterval(() => {
@@ -64,105 +149,17 @@ const startTimer = () => {
   }, 10)
 }
 
-const smallKana = ['ァ', 'ィ', 'ゥ', 'ェ', 'ォ', 'ッ', 'ャ', 'ュ', 'ョ', 'ヮ', 'ヵ', 'ヶ']
-
-//カタカナ文と現在位置から、打てるパターンを計算する関数
-const getNextPatterns = (reading, index) => {
-  if (index >= reading.length) return []
-
-  const patterns = []
-  const char1 = reading[index]
-  const char2 = reading[index + 1]
-
-  // 拗音
-  if (char2 && smallKana.includes(char2)) {
-    const compound = char1 + char2
-
-    if (romajiMap[compound]) {
-      romajiMap[compound].forEach((r) => {
-        patterns.push({ val: r, len: 2 }) // 2文字進む
-      })
-    }
-  }
-
-  //促音
-  if (char1 === 'ッ' && char2) {
-    if (romajiMap[char2]) {
-      const nextRomajiCandidates = romajiMap[char2]
-
-      // 次の文字の子音を見る
-      nextRomajiCandidates.forEach((nextRomaji) => {
-        const consonant = nextRomaji[0]
-
-        if (!['a', 'i', 'u', 'e', 'o', 'n'].includes(consonant)) {
-          patterns.push({ val: consonant, len: 1 })
-        }
-      })
-    }
-  }
-
-  //ンの入力
-  else if (char1 === 'ン') {
-    patterns.push({ val: 'nn', len: 1 })
-    patterns.push({ val: 'xn', len: 1 })
-
-    if (char2 && romajiMap[char2]) {
-      romajiMap[char2].forEach((nextRomaji) => {
-        const nextHead = nextRomaji[0]
-
-        if (!['a', 'i', 'u', 'e', 'o', 'n', 'y'].includes(nextHead)) {
-          patterns.push({ val: 'n' + nextRomaji, len: 2 })
-        }
-      })
-    }
-  }
-
-  // 通常の1文字
-  if (romajiMap[char1]) {
-    romajiMap[char1].forEach((r) => {
-      patterns.push({ val: r, len: 1 }) // 1文字進む
-    })
-  } else {
-    // 記号など
-    patterns.push({ val: char1, len: 1 })
-  }
-
-  return patterns
-}
-
-// 読み仮名から、理論上の最短タイプ数を計算する関数(DP)
-const calculateOptimalKeystrokes = (reading) => {
-  const dp = new Array(reading.length + 1).fill(Infinity)
-
-  dp[0] = 0
-
-  for (let i = 0; i < reading.length; i++) {
-    if (dp[i] === Infinity) continue
-
-    const patterns = getNextPatterns(reading, i)
-
-    patterns.forEach((pattern) => {
-      const nextIndex = i + pattern.len
-
-      const strokes = pattern.val.length
-
-      if (dp[i] + strokes < dp[nextIndex]) {
-        dp[nextIndex] = dp[i] + strokes
-      }
-    })
-  }
-  return dp[reading.length]
-}
-
-// ゲームの状態 ('start' | 'playing' | 'result')
-const gameState = ref('start')
-
-// 理論値の合計
-const totalOptimalKeystrokes = ref(0)
+// --- メインロジック ---
 
 const handleKeyDown = (event) => {
   if (gameState.value === 'start') {
+    if (event.code === 'Tab') {
+      event.preventDefault()
+      showRomajiTable.value = !showRomajiTable.value
+      return
+    }
     if (event.code === 'Space') {
+      showRomajiTable.value = false
       gameState.value = 'playing'
       startTimer()
 
@@ -171,12 +168,12 @@ const handleKeyDown = (event) => {
       currentCharIndex.value = 0
       currentRomajiInput.value = ''
       userRomaji.value = ''
-      totalKeystrokes.value = 0
+      totaltype.value = 0
+      correcttype.value = 0
       missCount.value = 0
       elapsedTime.value = 0
       totalOptimalKeystrokes.value = 0
 
-      // 最初の単語セット
       const firstWordObj = wordList[0]
       question.value = firstWordObj.display
       questionReading.value = firstWordObj.reading
@@ -185,10 +182,8 @@ const handleKeyDown = (event) => {
     return
   }
 
-  // 2. リザルト画面のとき（リトライ機能）
   if (gameState.value === 'result') {
     if (event.code === 'Space') {
-      // もう一度スタート画面に戻るのです
       gameState.value = 'start'
       question.value = 'Press Space to Start'
     }
@@ -196,58 +191,52 @@ const handleKeyDown = (event) => {
   }
 
   const nextInput = currentRomajiInput.value + event.key
-
   const nextPatterns = remainingPatterns.value.filter((pattern) => {
     return pattern.val.startsWith(nextInput)
   })
 
   if (nextPatterns.length > 0) {
-    // 正しい入力
-    totalKeystrokes.value++
+    // 正解
+    correcttype.value++
+    totaltype.value++
     currentRomajiInput.value = nextInput
     remainingPatterns.value = nextPatterns
-
     userRomaji.value += event.key
 
     const matched = remainingPatterns.value.find((p) => p.val === currentRomajiInput.value)
 
-    // 文字が完成したか
     if (matched) {
       currentCharIndex.value += matched.len
       currentRomajiInput.value = ''
 
-      const currentWordObj = wordList[currentWordIndex.value] // 現在の単語オブジェクト
+      const currentWordObj = wordList[currentWordIndex.value]
 
-      // 単語が完成したか
       if (currentCharIndex.value >= currentWordObj.reading.length) {
-        console.log('次の単語へ')
-        // 単語の理論値を合計に足す
+        // 単語完了
         totalOptimalKeystrokes.value += currentWordObj.optimal
-
         currentWordIndex.value++
 
         if (currentWordIndex.value >= wordList.length) {
-          // ゲーム終了！
+          // ゲーム終了
           clearInterval(timerId)
-          gameState.value = 'result' // リザルト画面へ！
+          gameState.value = 'result'
         } else {
           // 次の単語へ
           userRomaji.value = ''
           currentCharIndex.value = 0
-
           const nextWordObj = wordList[currentWordIndex.value]
-          question.value = nextWordObj.display // 漢字
-          questionReading.value = nextWordObj.reading // ふりがな
-
+          question.value = nextWordObj.display
+          questionReading.value = nextWordObj.reading
           remainingPatterns.value = getNextPatterns(nextWordObj.reading, 0)
         }
       } else {
-        // 次の文字へ（単語の途中）
+        // 次の文字へ
         remainingPatterns.value = getNextPatterns(currentWordObj.reading, currentCharIndex.value)
       }
     }
   } else {
     // ミスタイプ
+    totaltype.value++
     missCount.value++
   }
 }
@@ -256,14 +245,29 @@ const handleKeyDown = (event) => {
 <template>
   <div class="container">
     <div v-if="gameState === 'start'" class="screen start-screen">
-      <h1 class="title">しらないタイピング</h1>
-      <p class="blink">Press Space to Start</p>
+      <h1 class="title">Siranaiタイピング</h1>
+
+      <div v-if="!showRomajiTable">
+        <p class="blink">Press Space to Start</p>
+        <p style="font-size: 1rem; color: #888; margin-top: 1rem">(Press Tab to see Romaji Map)</p>
+      </div>
+
+      <div v-else class="romaji-table-overlay">
+        <h2>対応表 (Romaji Map)</h2>
+        <div class="table-grid">
+          <div v-for="(patterns, kana) in romajiMap" :key="kana" class="table-item">
+            <div class="kana">{{ kana }}</div>
+            <div class="romaji">{{ patterns.join(', ') }}</div>
+          </div>
+        </div>
+        <p style="margin-top: 1rem; color: #aaa">Press Tab to Close</p>
+      </div>
     </div>
 
     <div v-else-if="gameState === 'playing'" class="screen play-screen">
       <div class="hud">
         <span>Time: {{ elapsedTime.toFixed(1) }}</span>
-        <span>Score: {{ totalKeystrokes }}</span>
+        <span>TotalType: {{ totaltype }}</span>
       </div>
 
       <div id="question-display">
@@ -282,8 +286,8 @@ const handleKeyDown = (event) => {
           <span class="value">{{ elapsedTime.toFixed(2) }}秒</span>
         </div>
         <div class="result-item">
-          <span class="label">あなたの入力数</span>
-          <span class="value">{{ totalKeystrokes }}打</span>
+          <span class="label">正しい入力</span>
+          <span class="value">{{ correcttype }}打</span>
         </div>
         <div class="result-item">
           <span class="label">理論上の最短</span>
@@ -291,8 +295,8 @@ const handleKeyDown = (event) => {
         </div>
         <div class="result-item">
           <span class="label">無駄打ち</span>
-          <span class="value" :class="{ good: totalKeystrokes - totalOptimalKeystrokes <= 0 }">
-            +{{ totalKeystrokes - totalOptimalKeystrokes }}
+          <span class="value" :class="{ good: correcttype - totalOptimalKeystrokes <= 0 }">
+            +{{ correcttype - totalOptimalKeystrokes }}
           </span>
         </div>
         <div class="result-item">
@@ -307,15 +311,15 @@ const handleKeyDown = (event) => {
 </template>
 
 <style scoped>
-/* 全体の箱：画面の真ん中に持ってくるのです */
+@import url('https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500&display=swap');
 .container {
   display: flex;
   justify-content: center;
   align-items: center;
   height: 100vh;
-  background-color: #222; /* 黒に近いグレー */
-  color: #fff;
-  font-family: 'Courier New', monospace; /* プログラミングっぽいフォント */
+  background-color: #ecfff5;
+  color: #ff8f3f;
+  font-family: 'Zen Maru Gothic', sans-serif;
   text-align: center;
 }
 
@@ -329,8 +333,7 @@ const handleKeyDown = (event) => {
 .title {
   font-size: 4rem;
   margin-bottom: 2rem;
-  color: #00ffcc; /* サイバーな緑 */
-  text-shadow: 0 0 10px #00ffcc;
+  color: #ff8f3f;
 }
 
 /* 点滅アニメーション */
@@ -338,6 +341,7 @@ const handleKeyDown = (event) => {
   animation: blink 1s infinite;
   font-size: 1.5rem;
   margin-top: 2rem;
+  color: #23b3cd;
 }
 @keyframes blink {
   0%,
@@ -355,7 +359,7 @@ const handleKeyDown = (event) => {
   justify-content: space-between;
   font-size: 1.2rem;
   margin-bottom: 3rem;
-  border-bottom: 1px solid #555;
+  border-bottom: 2px dashed #ff8f3f;
   padding-bottom: 10px;
 }
 .reading {
@@ -371,14 +375,13 @@ const handleKeyDown = (event) => {
 .input-feedback {
   font-size: 2.5rem;
   font-weight: bold;
-  color: deepskyblue;
-  min-height: 3rem; /* 文字がなくてもガタつかないように */
-  text-shadow: 0 0 5px deepskyblue;
+  color: #23b3cd;
+  min-height: 3rem;
 }
 
 /* リザルト画面 */
 .result-box {
-  background: #333;
+  background: #23b4cd31;
   padding: 2rem;
   border-radius: 10px;
   margin: 2rem auto;
@@ -398,6 +401,67 @@ const handleKeyDown = (event) => {
   color: #ff3366;
 }
 .retry-msg {
-  color: #aaa;
+  color: #23b3cd;
+}
+
+/* ローマ字表の枠組み */
+.romaji-table-overlay {
+  background: rgba(255, 255, 255, 0.95);
+  border: 3px solid #ff8f3f;
+  border-radius: 15px;
+  padding: 20px;
+  max-height: 60vh;
+  overflow-y: auto;
+  width: 90%;
+  margin: 0 auto;
+  box-shadow: 0 0 15px rgba(255, 143, 63, 0.3);
+  color: #5d4037;
+
+  /* 追加: 画面の上に表示するために必要！ */
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 100;
+}
+
+/* グリッドレイアウト */
+.table-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 10px;
+  text-align: center;
+}
+
+.table-item {
+  background: #ecfff5;
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid #23b3cd;
+}
+
+.kana {
+  color: #ff8f3f;
+  font-weight: bold;
+  font-size: 1.2rem;
+}
+
+.romaji {
+  font-size: 0.9rem;
+  color: #23b3cd;
+  font-family: sans-serif;
+}
+
+/*スクロールバー*/
+.romaji-table-overlay::-webkit-scrollbar {
+  width: 10px;
+}
+.romaji-table-overlay::-webkit-scrollbar-track {
+  background: #fff;
+  border-radius: 5px;
+}
+.romaji-table-overlay::-webkit-scrollbar-thumb {
+  background: #ff8f3f;
+  border-radius: 5px;
 }
 </style>
