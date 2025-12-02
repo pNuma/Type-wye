@@ -283,25 +283,56 @@ const handleKeyDown = (event) => {
       <div class="result-box">
         <div class="result-item">
           <span class="label">タイム</span>
-          <span class="value">{{ elapsedTime.toFixed(2) }}秒</span>
+          <span class="value">{{ elapsedTime.toFixed(2) }} 秒</span>
         </div>
+
+        <hr style="border: 0; border-top: 2px dashed #ff8f3f; margin: 20px 0; opacity: 0.5" />
+
         <div class="result-item">
-          <span class="label">正しい入力</span>
-          <span class="value">{{ correcttype }}打</span>
+          <span class="label">総タイプ数</span>
+          <span class="value">{{ totaltype }} 打</span>
         </div>
+
         <div class="result-item">
-          <span class="label">理論上の最短</span>
-          <span class="value">{{ totalOptimalKeystrokes }}打</span>
-        </div>
-        <div class="result-item">
-          <span class="label">無駄打ち</span>
-          <span class="value" :class="{ good: correcttype - totalOptimalKeystrokes <= 0 }">
-            +{{ correcttype - totalOptimalKeystrokes }}
+          <span class="label">正タイプ率</span>
+          <span
+            class="value"
+            :class="{
+              good: totaltype > 0 && correcttype === totaltype,
+              bad: totaltype === 0 || correcttype !== totaltype,
+            }"
+          >
+            {{ totaltype > 0 ? Math.round((correcttype / totaltype) * 100) : 0 }} %
           </span>
         </div>
+
+        <hr style="border: 0; border-top: 2px dashed #ff8f3f; margin: 20px 0; opacity: 0.5" />
+
         <div class="result-item">
-          <span class="label">ミスタイプ</span>
-          <span class="value" :class="{ bad: missCount > 0 }">{{ missCount }}回</span>
+          <span class="label">有効入力</span>
+          <span class="value">{{ correcttype }} 打</span>
+        </div>
+
+        <div class="result-item">
+          <span class="label">最短入力</span>
+          <span class="value">{{ totalOptimalKeystrokes }} 打</span>
+        </div>
+
+        <div class="result-item">
+          <span class="label">ロス</span>
+          <span
+            class="value"
+            :class="{
+              good: correcttype - totalOptimalKeystrokes <= 0,
+              bad: correcttype - totalOptimalKeystrokes > 0,
+            }"
+          >
+            {{
+              correcttype - totalOptimalKeystrokes <= 0
+                ? 'Perfect!!'
+                : '+' + (correcttype - totalOptimalKeystrokes) + ' 打'
+            }}
+          </span>
         </div>
       </div>
 
@@ -312,12 +343,18 @@ const handleKeyDown = (event) => {
 
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500&display=swap');
+
+/* 全体 */
 .container {
   display: flex;
   justify-content: center;
   align-items: center;
   height: 100vh;
+
   background-color: #ecfff5;
+  background-image: radial-gradient(#23b3cd 1px, transparent 1px);
+  background-size: 20px 20px;
+
   color: #ff8f3f;
   font-family: 'Zen Maru Gothic', sans-serif;
   text-align: center;
@@ -325,15 +362,23 @@ const handleKeyDown = (event) => {
 
 /* 各画面共通 */
 .screen {
-  width: 100%;
-  max-width: 800px;
+  background: #ffffffe6;
+  padding: 40px;
+  border-radius: 20px;
+  box-shadow: 0 10px 25px #23b3cd26;
+  width: 90%;
+  max-width: 700px;
+  backdrop-filter: blur(5px);
 }
 
 /* タイトル */
 .title {
-  font-size: 4rem;
-  margin-bottom: 2rem;
+  font-size: 3.5rem;
+  margin-bottom: 1.5rem;
   color: #ff8f3f;
+  text-shadow:
+    1px 1px 0px #ffffff,
+    2px 2px 0px #23b3cd;
 }
 
 /* 点滅アニメーション */
@@ -385,17 +430,16 @@ const handleKeyDown = (event) => {
   padding: 2rem;
   border-radius: 10px;
   margin: 2rem auto;
-  width: 80%;
+  width: 40%;
 }
 .result-item {
   display: flex;
   justify-content: space-between;
   margin-bottom: 1rem;
   font-size: 1.5rem;
-  border-bottom: 1px dashed #555;
 }
 .good {
-  color: #00ffcc;
+  color: #00c73c;
 }
 .bad {
   color: #ff3366;
@@ -406,7 +450,7 @@ const handleKeyDown = (event) => {
 
 /* ローマ字表の枠組み */
 .romaji-table-overlay {
-  background: rgba(255, 255, 255, 0.95);
+  background: #ffffffea;
   border: 3px solid #ff8f3f;
   border-radius: 15px;
   padding: 20px;
@@ -414,10 +458,10 @@ const handleKeyDown = (event) => {
   overflow-y: auto;
   width: 90%;
   margin: 0 auto;
-  box-shadow: 0 0 15px rgba(255, 143, 63, 0.3);
+  box-shadow: 0 0 15px #5d4037d7;
   color: #5d4037;
 
-  /* 追加: 画面の上に表示するために必要！ */
+  /* 画面の上に表示する */
   position: absolute;
   top: 50%;
   left: 50%;
