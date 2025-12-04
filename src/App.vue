@@ -1,6 +1,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
 import { romajiMap } from './romajiMap.js'
+import { tableLayout } from './tableLayout.js'
 
 // 状態変数たち
 const question = ref('Now Loading...')
@@ -253,13 +254,30 @@ const handleKeyDown = (event) => {
       </div>
 
       <div v-else class="romaji-table-overlay">
-        <h2>対応表 (Romaji Map)</h2>
-        <div class="table-grid">
-          <div v-for="(patterns, kana) in romajiMap" :key="kana" class="table-item">
-            <div class="kana">{{ kana }}</div>
-            <div class="romaji">{{ patterns.join(', ') }}</div>
+        <h2>ローマ字表</h2>
+
+        <div class="table-header">
+          <div></div>
+          <div>a</div>
+          <div>i</div>
+          <div>u</div>
+          <div>e</div>
+          <div>o</div>
+        </div>
+
+        <div class="table-rows">
+          <div v-for="(row, index) in tableLayout" :key="index" class="table-row">
+            <div class="row-label">{{ row.label }}</div>
+
+            <div v-for="(char, i) in row.chars" :key="i" class="table-cell">
+              <div v-if="char" class="cell-content">
+                <div class="kana">{{ char }}</div>
+                <div class="romaji">{{ romajiMap[char]?.join(', ') }}</div>
+              </div>
+            </div>
           </div>
         </div>
+
         <p style="margin-top: 1rem; color: #aaa">Press Tab to Close</p>
       </div>
     </div>
@@ -450,6 +468,7 @@ const handleKeyDown = (event) => {
 
 /* ローマ字表の枠組み */
 .romaji-table-overlay {
+  max-width: 900px;
   background: #ffffffea;
   border: 3px solid #ff8f3f;
   border-radius: 15px;
@@ -469,43 +488,64 @@ const handleKeyDown = (event) => {
   z-index: 100;
 }
 
-/* グリッドレイアウト */
-.table-grid {
+/* ヘッダー（a i u e o） */
+.table-header {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-  gap: 10px;
-  text-align: center;
+  /* 左端(60px) + 5等分(1fr × 5) */
+  grid-template-columns: 60px repeat(5, 1fr);
+  gap: 5px;
+  margin-bottom: 10px;
+  font-weight: bold;
+  color: #ff8f3f;
+  border-bottom: 2px solid #ff8f3f;
+  padding-bottom: 5px;
 }
 
-.table-item {
+/* 行ごとの設定 */
+.table-row {
+  display: grid;
+  grid-template-columns: 60px repeat(5, 1fr);
+  gap: 5px;
+  margin-bottom: 5px;
+  align-items: center;
+}
+
+.row-label {
+  font-weight: bold;
+  color: #5d4037;
+  font-size: 0.9rem;
+}
+
+.table-cell {
   background: #ecfff5;
-  padding: 8px;
-  border-radius: 8px;
+  border-radius: 6px;
+  min-height: 50px; /* 空白セルも高さを持つように */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 中身があるときだけ枠線をつける */
+.cell-content {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   border: 1px solid #23b3cd;
+  border-radius: 6px;
+  background: #fff;
 }
 
 .kana {
+  font-size: 1.1rem;
   color: #ff8f3f;
   font-weight: bold;
-  font-size: 1.2rem;
 }
 
 .romaji {
-  font-size: 0.9rem;
+  font-size: 0.75rem;
   color: #23b3cd;
-  font-family: sans-serif;
-}
-
-/*スクロールバー*/
-.romaji-table-overlay::-webkit-scrollbar {
-  width: 10px;
-}
-.romaji-table-overlay::-webkit-scrollbar-track {
-  background: #fff;
-  border-radius: 5px;
-}
-.romaji-table-overlay::-webkit-scrollbar-thumb {
-  background: #ff8f3f;
-  border-radius: 5px;
 }
 </style>
