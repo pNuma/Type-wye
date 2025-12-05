@@ -246,7 +246,7 @@ const handleKeyDown = (event) => {
 <template>
   <div class="container">
     <div v-if="gameState === 'start'" class="screen start-screen">
-      <h1 class="title">Siranaiタイピング</h1>
+      <h1 class="title">ゑって打てる？</h1>
 
       <div v-if="!showRomajiTable">
         <p class="blink">Press Space to Start</p>
