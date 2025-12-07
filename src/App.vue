@@ -246,7 +246,10 @@ const handleKeyDown = (event) => {
 <template>
   <div class="container">
     <div v-if="gameState === 'start'" class="screen start-screen">
-      <h1 class="title">ゑって打てる？</h1>
+      <h1 class="title-logo">
+        <span class="logo-small">ゑって</span>
+        <span class="logo-main">打てる？</span>
+      </h1>
 
       <div v-if="!showRomajiTable">
         <p class="blink">Press Space to Start</p>
@@ -390,15 +393,33 @@ const handleKeyDown = (event) => {
 }
 
 /* タイトル */
-.title {
-  font-size: 3.5rem;
-  margin-bottom: 1.5rem;
-  color: #ff8f3f;
-  text-shadow:
-    1px 1px 0px #ffffff,
-    2px 2px 0px #23b3cd;
+.title-logo {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  margin: 0 auto 2rem;
+  line-height: 1;
 }
 
+/* 上の「ゑって」 */
+.logo-small {
+  font-size: 3rem;
+  color: #23b3cd;
+  font-weight: bold;
+  margin-left: 10px;
+  z-index: 1;
+}
+
+/* 下の「打てる？」 */
+.logo-main {
+  font-size: 5rem;
+  color: #ff8f3f;
+  font-weight: 900;
+  text-shadow:
+    2px 2px 0px #ffffff,
+    5px 5px 0px #23b3cd;
+}
 /* 点滅アニメーション */
 .blink {
   animation: blink 1s infinite;
