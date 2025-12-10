@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { romajiMap } from './romajiMap.js'
 import { tableLayout } from './tableLayout.js'
 
@@ -241,6 +241,13 @@ const handleKeyDown = (event) => {
     missCount.value++
   }
 }
+
+// プログレスバー
+const progressPercentage = computed(() => {
+  if (!wordList || wordList.length === 0) return 0
+  const percentage = (currentWordIndex.value / wordList.length) * 100
+  return Math.min(percentage, 100)
+})
 </script>
 
 <template>
@@ -295,6 +302,17 @@ const handleKeyDown = (event) => {
         <div class="reading">{{ questionReading }}</div>
         <div class="kanji">{{ question }}</div>
         <div class="input-feedback">{{ userRomaji }}</div>
+      </div>
+
+      <div class="progress-container">
+        <div class="progress-rail"></div>
+
+        <img
+          src="\public\progress_char.png"
+          alt="進捗キャラクター"
+          class="progress-character"
+          :style="{ left: progressPercentage + '%' }"
+        />
       </div>
     </div>
 
@@ -460,7 +478,13 @@ const handleKeyDown = (event) => {
   font-size: 2.5rem;
   font-weight: bold;
   color: #23b3cd;
-  min-height: 3rem;
+
+  height: 3.5rem;
+  line-height: 3.5rem;
+  margin-top: 10px;
+
+  overflow: hidden;
+  white-space: nowrap;
 }
 
 /* リザルト画面 */
@@ -568,5 +592,40 @@ const handleKeyDown = (event) => {
 .romaji {
   font-size: 0.75rem;
   color: #23b3cd;
+}
+
+/* --- プログレスバーの装飾 --- */
+/* コンテナ */
+.progress-container {
+  position: relative;
+  width: 100%;
+  height: 60px;
+  margin-top: 2rem;
+  padding-right: 50px;
+  box-sizing: border-box;
+}
+
+/* キャラが歩く道 */
+.progress-rail {
+  position: absolute;
+  bottom: 15px;
+  left: 0;
+  width: 100%;
+  height: 0;
+  border-bottom: 3px dashed #ff8f3f;
+  opacity: 0.5;
+  z-index: 1;
+}
+
+/* 動くキャラクター */
+.progress-character {
+  position: absolute;
+  bottom: 15px;
+  width: 50px;
+  height: auto;
+  image-rendering: pixelated;
+  transition: left 0.5s cubic-bezier(0.25, 0.8, 0.25, 1);
+
+  z-index: 2;
 }
 </style>
