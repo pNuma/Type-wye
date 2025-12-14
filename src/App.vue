@@ -7,6 +7,7 @@ import { tableLayout } from './tableLayout.js'
 const question = ref('Now Loading...')
 const showRomajiTable = ref(false)
 const questionReading = ref('') // 読み仮名用
+const questionComment = ref('')
 const userRomaji = ref('')
 let txt = './wordlist.txt'
 let wordList = []
@@ -124,8 +125,9 @@ onMounted(() => {
           const parts = line.split(',')
           const display = parts[0]
           const reading = parts[1] || parts[0]
+          const comment = parts[2] || '...' // 解説がない時は「...」
           const optimal = calculateOptimalKeystrokes(reading)
-          return { display, reading, optimal }
+          return { display, reading, comment, optimal }
         })
       wordList = list
       question.value = 'Press Space to Start'
@@ -178,6 +180,7 @@ const handleKeyDown = (event) => {
       const firstWordObj = wordList[0]
       question.value = firstWordObj.display
       questionReading.value = firstWordObj.reading
+      questionComment.value = firstWordObj.comment
       remainingPatterns.value = getNextPatterns(firstWordObj.reading, 0)
     }
     return
@@ -228,6 +231,7 @@ const handleKeyDown = (event) => {
           const nextWordObj = wordList[currentWordIndex.value]
           question.value = nextWordObj.display
           questionReading.value = nextWordObj.reading
+          questionComment.value = nextWordObj.comment
           remainingPatterns.value = getNextPatterns(nextWordObj.reading, 0)
         }
       } else {
@@ -300,15 +304,22 @@ const progressPercentage = computed(() => {
 
       <div id="question-display">
         <div class="reading">{{ questionReading }}</div>
-        <div class="kanji">{{ question }}</div>
+
+        <div class="question-container">
+          <div class="question">{{ question }}</div>
+        </div>
+
         <div class="input-feedback">{{ userRomaji }}</div>
+
+        <div class="comment-bubble" v-if="questionComment">
+          {{ questionComment }}
+        </div>
       </div>
 
       <div class="progress-container">
         <div class="progress-rail"></div>
-
         <img
-          src="\public\progress_char.png"
+          src="/public/progress_char.png"
           alt="進捗キャラクター"
           class="progress-character"
           :style="{ left: progressPercentage + '%' }"
@@ -469,11 +480,60 @@ const progressPercentage = computed(() => {
   color: #aaa;
   margin-bottom: 0.5rem;
 }
-.kanji {
+
+.question-container {
+  position: relative;
+  display: inline-block;
+}
+
+.question {
   font-size: 4rem;
   font-weight: bold;
-  margin-bottom: 1rem;
 }
+
+/* コメント */
+.comment-bubble {
+  position: relative;
+  display: inline-block;
+  top: 20px;
+  background: #fff;
+  color: #5d4037;
+  padding: 10px 20px;
+  border-radius: 15px;
+  border: 2px solid #23b3cd;
+  font-size: 1rem;
+  max-width: 80%;
+  line-height: 1.4;
+  box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.1);
+
+  animation: popIn 0.5s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+}
+
+.comment-bubble::after {
+  content: '';
+  position: absolute;
+
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+
+  /* 三角形　*/
+  border-width: 0 10px 10px 10px;
+  border-style: solid;
+  border-color: transparent transparent #23b3cd transparent;
+}
+
+@keyframes popIn {
+  0% {
+    transform: translateY(-10px) scale(0.8);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
 .input-feedback {
   font-size: 2.5rem;
   font-weight: bold;
