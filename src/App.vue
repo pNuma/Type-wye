@@ -417,7 +417,7 @@ const progressPercentage = computed(() => {
   border-radius: 20px;
   box-shadow: 0 10px 25px #23b3cd26;
   width: 90%;
-  max-width: 700px;
+  max-width: 800px;
   backdrop-filter: blur(5px);
 }
 
