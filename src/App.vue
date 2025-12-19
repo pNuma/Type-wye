@@ -688,4 +688,37 @@ const progressPercentage = computed(() => {
 
   z-index: 2;
 }
+
+/* スマホ用調整 */
+
+@media (max-width: 600px) {
+  /* 全体の余白を詰める */
+  #app,
+  body,
+  .container {
+    padding: 10px !important;
+    width: 100% !important;
+    overflow-x: hidden;
+  }
+
+  /* 問題文（ローマ字など）の文字サイズを小さく */
+  h1,
+  h2,
+  .question,
+  .roman {
+    font-size: 1.5rem !important;
+    line-height: 1.2;
+    word-break: break-all; /* 長い単語を折り返す */
+  }
+
+  .title {
+    font-size: 2rem !important;
+  }
+
+  button {
+    width: 100%;
+    margin-top: 10px;
+    padding: 15px;
+  }
+}
 </style>
